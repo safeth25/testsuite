@@ -2,211 +2,408 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Test A.2 – Entscheidungs-Reaktionstest</title>
+
   <style>
-    body { font-family: sans-serif; margin: 0; overflow: hidden; position: relative; }
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      overflow: hidden;
+      position: relative;
+      background-color: white;
+    }
+
     #instructions {
       padding: 1em;
       background: #fafafa;
       border-bottom: 1px solid #ddd;
     }
+
+    #instructions h3 {
+      margin-top: 0;
+    }
+
+    #main {
+      padding: 1em;
+    }
+
     #stimulus {
       position: absolute;
       pointer-events: none;
       display: none;
     }
+
     #results p {
-      margin: 0.2em 1em;
+      margin: 0.3em 0;
     }
   </style>
 </head>
+
 <body>
-  <!-- Erklärung für A.2 -->
   <div id="instructions">
     <h3>Test A.2 – Entscheidungs-Reaktionstest</h3>
     <ol>
-      <li>Auf dem weißen Bildschirm erscheinen nacheinander farbige Formen (Quadrat oder gleichseitiges Dreieck) in Lila oder Orange, mit Größe 100–300 px.</li>
-      <li>Drücken Sie nur bei Quadraten die Leertaste so schnell wie möglich.</li>
-      <li>Ignorieren Sie Dreiecke (keine Taste drücken). Jede Reaktion auf ein Dreieck zählt als Fehler.</li>
-      <li>Es werden insgesamt 30 gültige Reaktionen auf Quadrate aufgezeichnet.</li>
-      <li>Am Ende drücken Sie einmal <strong>a</strong>, um die Ergebnisse anzuzeigen: Mittelwert, Standardabweichung und Fehlerrate jeweils getrennt für Lila und Orange.</li>
+      <li>Auf dem weißen Bildschirm erscheinen nacheinander gefüllte Kreise oder gefüllte Dreiecke.</li>
+      <li>Die Größe der Formen liegt zufällig zwischen 100 und 300 Pixeln.</li>
+      <li>Die Farbe ist zufällig Grün oder Gelb.</li>
+      <li>Drücken Sie die <strong>Leertaste</strong> nur dann so schnell wie möglich, wenn ein <strong>Kreis</strong> erscheint.</li>
+      <li>Drücken Sie keine Taste, wenn ein Dreieck erscheint.</li>
+      <li>Ein Tastendruck bei einem Dreieck oder vor dem Erscheinen eines Stimulus zählt als Fehler.</li>
+      <li>Es werden insgesamt 30 Stimuli gezeigt.</li>
+      <li>Am Ende werden Mittelwert, Standardabweichung und Fehlerrate angezeigt, zusätzlich getrennt nach Farbe.</li>
     </ol>
   </div>
 
-  <h1>Test A.2 – Entscheidungs-Reaktionstest</h1>
-  <h2 id="instruction">Drücke Leertaste, um zu starten</h2>
-  <div id="stimulus"></div>
+  <div id="main">
+    <h1>Test A.2 – Entscheidungs-Reaktionstest</h1>
+    <h2 id="instruction">Drücke Leertaste, um zu starten</h2>
 
-  <div id="results">
-    <p id="time"></p>
-    <p id="count"></p>
-    <p id="meanPurple"></p>
-    <p id="sdPurple"></p>
-    <p id="errPurple"></p>
-    <p id="meanOrange"></p>
-    <p id="sdOrange"></p>
-    <p id="errOrange"></p>
+    <div id="results">
+      <p id="time"></p>
+      <p id="count"></p>
+      <p id="meanTotal"></p>
+      <p id="sdTotal"></p>
+      <p id="errTotal"></p>
+      <p id="meanGreen"></p>
+      <p id="sdGreen"></p>
+      <p id="errGreen"></p>
+      <p id="meanYellow"></p>
+      <p id="sdYellow"></p>
+      <p id="errYellow"></p>
+    </div>
   </div>
 
+  <div id="stimulus"></div>
+
   <script>
-    // DOM-Elemente
     const instructionEl = document.getElementById('instruction');
-    const stimulusEl   = document.getElementById('stimulus');
-    const timeEl       = document.getElementById('time');
-    const countEl      = document.getElementById('count');
-    const meanPurpleEl = document.getElementById('meanPurple');
-    const sdPurpleEl   = document.getElementById('sdPurple');
-    const errPurpleEl  = document.getElementById('errPurple');
-    const meanOrangeEl = document.getElementById('meanOrange');
-    const sdOrangeEl   = document.getElementById('sdOrange');
-    const errOrangeEl  = document.getElementById('errOrange');
+    const stimulusEl = document.getElementById('stimulus');
 
-    // Statistische Hilfsfunktionen
+    const timeEl = document.getElementById('time');
+    const countEl = document.getElementById('count');
+
+    const meanTotalEl = document.getElementById('meanTotal');
+    const sdTotalEl = document.getElementById('sdTotal');
+    const errTotalEl = document.getElementById('errTotal');
+
+    const meanGreenEl = document.getElementById('meanGreen');
+    const sdGreenEl = document.getElementById('sdGreen');
+    const errGreenEl = document.getElementById('errGreen');
+
+    const meanYellowEl = document.getElementById('meanYellow');
+    const sdYellowEl = document.getElementById('sdYellow');
+    const errYellowEl = document.getElementById('errYellow');
+
     function getMean(arr) {
-      return arr.reduce((sum, x) => sum + x, 0) / arr.length;
+      if (arr.length === 0) return null;
+      return arr.reduce((sum, value) => sum + value, 0) / arr.length;
     }
+
     function getStd(arr) {
-      const m = getMean(arr);
-      return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / arr.length);
+      if (arr.length === 0) return null;
+
+      const mean = getMean(arr);
+      const variance = arr.reduce((sum, value) => {
+        return sum + Math.pow(value - mean, 2);
+      }, 0) / arr.length;
+
+      return Math.sqrt(variance);
     }
 
-    // Experiment-Variablen
-    let experimentActive  = false;
-    const maxTrials       = 30;
-    let timesPurple       = [];
-    let timesOrange       = [];
-    let errorsPurple      = 0;
-    let errorsOrange      = 0;
-    let validResponses    = 0;
-    let currentShape      = null;
-    let currentColor      = null;
-    let startTime         = 0;
-    let pauseTimer        = null;
-    let triangleTimer     = null;
+    function formatMs(value) {
+      if (value === null) return 'keine gültigen Daten';
+      return `${Math.round(value)} ms`;
+    }
 
-    // Anzeige-Funktionen
+    function formatPercent(value) {
+      return `${(value * 100).toFixed(1)} %`;
+    }
+
+    let experimentActive = false;
+    let stimulusVisible = false;
+
+    const maxStimuli = 30;
+
+    let shownStimuli = 0;
+    let validResponses = 0;
+
+    let currentShape = null;
+    let currentColor = null;
+    let startTime = 0;
+
+    let pauseTimer = null;
+    let triangleTimer = null;
+
+    let timesTotal = [];
+    let timesGreen = [];
+    let timesYellow = [];
+
+    let errorsTotal = 0;
+    let errorsGreen = 0;
+    let errorsYellow = 0;
+    let prematureErrors = 0;
+
+    let greenStimuli = 0;
+    let yellowStimuli = 0;
+
     function clearResults() {
-      timeEl.textContent        = '';
-      countEl.textContent       = '';
-      meanPurpleEl.textContent  = '';
-      sdPurpleEl.textContent    = '';
-      errPurpleEl.textContent   = '';
-      meanOrangeEl.textContent  = '';
-      sdOrangeEl.textContent    = '';
-      errOrangeEl.textContent   = '';
+      timeEl.textContent = '';
+      countEl.textContent = '';
+      meanTotalEl.textContent = '';
+      sdTotalEl.textContent = '';
+      errTotalEl.textContent = '';
+      meanGreenEl.textContent = '';
+      sdGreenEl.textContent = '';
+      errGreenEl.textContent = '';
+      meanYellowEl.textContent = '';
+      sdYellowEl.textContent = '';
+      errYellowEl.textContent = '';
+    }
+
+    function resetStimulusStyle() {
+      stimulusEl.style.width = '0';
+      stimulusEl.style.height = '0';
+      stimulusEl.style.backgroundColor = 'transparent';
+      stimulusEl.style.border = 'none';
+      stimulusEl.style.borderRadius = '0';
     }
 
     function showResults() {
-      countEl.textContent = `Versuche: ${validResponses} / ${maxTrials}`;
-      const meanP = timesPurple.length ? Math.round(getMean(timesPurple)) : 0;
-      const sdP   = timesPurple.length ? Math.round(getStd(timesPurple))  : 0;
-      meanPurpleEl.textContent = `Mittel (lila): ${meanP} ms`;
-      sdPurpleEl.textContent   = `SD (lila): ${sdP} ms`;
-      errPurpleEl.textContent  = `Fehler (lila): ${errorsPurple}`;
+      const totalTrialsWithPossibleErrors = shownStimuli + prematureErrors;
+      const totalErrorRate =
+        totalTrialsWithPossibleErrors > 0 ? errorsTotal / totalTrialsWithPossibleErrors : 0;
 
-      const meanO = timesOrange.length ? Math.round(getMean(timesOrange)) : 0;
-      const sdO   = timesOrange.length ? Math.round(getStd(timesOrange))  : 0;
-      meanOrangeEl.textContent = `Mittel (orange): ${meanO} ms`;
-      sdOrangeEl.textContent   = `SD (orange): ${sdO} ms`;
-      errOrangeEl.textContent  = `Fehler (orange): ${errorsOrange}`;
+      const greenErrorRate = greenStimuli > 0 ? errorsGreen / greenStimuli : 0;
+      const yellowErrorRate = yellowStimuli > 0 ? errorsYellow / yellowStimuli : 0;
+
+      countEl.textContent =
+        `Gezeigte Stimuli: ${shownStimuli} / ${maxStimuli}, gültige Kreis-Reaktionen: ${validResponses}`;
+
+      meanTotalEl.textContent = `Mittelwert gesamt: ${formatMs(getMean(timesTotal))}`;
+      sdTotalEl.textContent = `Standardabweichung gesamt: ${formatMs(getStd(timesTotal))}`;
+      errTotalEl.textContent =
+        `Fehlerrate gesamt: ${formatPercent(totalErrorRate)} (${errorsTotal} Fehler, davon ${prematureErrors} zu früh)`;
+
+      meanGreenEl.textContent = `Mittelwert Grün: ${formatMs(getMean(timesGreen))}`;
+      sdGreenEl.textContent = `Standardabweichung Grün: ${formatMs(getStd(timesGreen))}`;
+      errGreenEl.textContent =
+        `Fehlerrate Grün: ${formatPercent(greenErrorRate)} (${errorsGreen} Fehler bei ${greenStimuli} grünen Stimuli)`;
+
+      meanYellowEl.textContent = `Mittelwert Gelb: ${formatMs(getMean(timesYellow))}`;
+      sdYellowEl.textContent = `Standardabweichung Gelb: ${formatMs(getStd(timesYellow))}`;
+      errYellowEl.textContent =
+        `Fehlerrate Gelb: ${formatPercent(yellowErrorRate)} (${errorsYellow} Fehler bei ${yellowStimuli} gelben Stimuli)`;
     }
 
-    // Stimulus anzeigen
-    function showStimulus() {
-      currentShape = Math.random() < 0.5 ? 'square' : 'triangle';
-      const size   = 100 + Math.random() * 200;
-      currentColor = Math.random() < 0.5 ? 'purple' : 'orange';
+    function hideStimulus() {
+      stimulusVisible = false;
+      stimulusEl.style.display = 'none';
+      clearTimeout(triangleTimer);
+    }
 
-      // Styling
-      stimulusEl.style.border = '';
-      if (currentShape === 'square') {
-        stimulusEl.style.width           = `${size}px`;
-        stimulusEl.style.height          = `${size}px`;
-        stimulusEl.style.backgroundColor = currentColor;
-      } else {
-        stimulusEl.style.width           = '0';
-        stimulusEl.style.height          = '0';
-        stimulusEl.style.backgroundColor = 'transparent';
-        stimulusEl.style.borderLeft      = `${size/2}px solid transparent`;
-        stimulusEl.style.borderRight     = `${size/2}px solid transparent`;
-        stimulusEl.style.borderBottom    = `${size}px solid ${currentColor}`;
+    function showStimulus() {
+      if (!experimentActive) return;
+
+      if (shownStimuli >= maxStimuli) {
+        endExperiment();
+        return;
       }
 
-      // Position
-      const w = window.innerWidth  - size;
-      const h = window.innerHeight - size;
-      const x = Math.random() * Math.max(w,0);
-      const y = Math.random() * Math.max(h,0);
-      stimulusEl.style.left    = `${x}px`;
-      stimulusEl.style.top     = `${y}px`;
+      shownStimuli++;
+
+      currentShape = Math.random() < 0.5 ? 'circle' : 'triangle';
+      currentColor = Math.random() < 0.5 ? 'green' : 'yellow';
+
+      if (currentColor === 'green') {
+        greenStimuli++;
+      } else {
+        yellowStimuli++;
+      }
+
+      const size = 100 + Math.random() * 200;
+
+      resetStimulusStyle();
+
+      if (currentShape === 'circle') {
+        stimulusEl.style.width = `${size}px`;
+        stimulusEl.style.height = `${size}px`;
+        stimulusEl.style.backgroundColor = currentColor;
+        stimulusEl.style.borderRadius = '50%';
+      } else {
+        stimulusEl.style.width = '0';
+        stimulusEl.style.height = '0';
+        stimulusEl.style.backgroundColor = 'transparent';
+        stimulusEl.style.borderLeft = `${size / 2}px solid transparent`;
+        stimulusEl.style.borderRight = `${size / 2}px solid transparent`;
+        stimulusEl.style.borderBottom = `${size}px solid ${currentColor}`;
+      }
+
+      const availableWidth = window.innerWidth - size;
+      const availableHeight = window.innerHeight - size;
+
+      const x = Math.random() * Math.max(availableWidth, 0);
+      const y = Math.random() * Math.max(availableHeight, 0);
+
+      stimulusEl.style.left = `${x}px`;
+      stimulusEl.style.top = `${y}px`;
       stimulusEl.style.display = 'block';
 
-      if (currentShape === 'square') {
-        startTime = performance.now();
-      } else {
+      stimulusVisible = true;
+      startTime = performance.now();
+
+      countEl.textContent = `Gezeigte Stimuli: ${shownStimuli} / ${maxStimuli}`;
+
+      if (currentShape === 'triangle') {
         triangleTimer = setTimeout(() => {
-          stimulusEl.style.display = 'none';
-          scheduleNext();
+          if (!experimentActive || !stimulusVisible || currentShape !== 'triangle') {
+            return;
+          }
+
+          hideStimulus();
+
+          if (shownStimuli >= maxStimuli) {
+            endExperiment();
+          } else {
+            scheduleNextStimulus();
+          }
         }, 1000 + Math.random() * 3000);
       }
     }
 
-    function scheduleNext() {
+    function scheduleNextStimulus() {
       pauseTimer = setTimeout(() => {
-        if (validResponses >= maxTrials) {
+        if (!experimentActive) return;
+
+        if (shownStimuli >= maxStimuli) {
           endExperiment();
         } else {
           showStimulus();
         }
-      }, Math.random() * 4000 + 2000); // 2–6 s
+      }, Math.random() * 4000 + 2000);
     }
 
     function startExperiment() {
       clearTimeout(pauseTimer);
       clearTimeout(triangleTimer);
+
       experimentActive = true;
-      validResponses   = 0;
-      timesPurple      = [];
-      timesOrange      = [];
-      errorsPurple     = 0;
-      errorsOrange     = 0;
+      stimulusVisible = false;
+
+      shownStimuli = 0;
+      validResponses = 0;
+
+      currentShape = null;
+      currentColor = null;
+      startTime = 0;
+
+      timesTotal = [];
+      timesGreen = [];
+      timesYellow = [];
+
+      errorsTotal = 0;
+      errorsGreen = 0;
+      errorsYellow = 0;
+      prematureErrors = 0;
+
+      greenStimuli = 0;
+      yellowStimuli = 0;
+
+      hideStimulus();
       clearResults();
-      instructionEl.textContent = 'Reagiere nur auf Quadrate mit der Leertaste';
-      scheduleNext();
+
+      instructionEl.textContent = 'Reagiere nur auf Kreise mit der Leertaste';
+      scheduleNextStimulus();
+    }
+
+    function handleCircleResponse() {
+      const reactionTime = performance.now() - startTime;
+
+      timesTotal.push(reactionTime);
+
+      if (currentColor === 'green') {
+        timesGreen.push(reactionTime);
+      } else {
+        timesYellow.push(reactionTime);
+      }
+
+      validResponses++;
+
+      timeEl.textContent = `Letzte Reaktionszeit: ${Math.round(reactionTime)} ms`;
+
+      hideStimulus();
+
+      if (shownStimuli >= maxStimuli) {
+        endExperiment();
+      } else {
+        scheduleNextStimulus();
+      }
+    }
+
+    function handleTriangleError() {
+      errorsTotal++;
+
+      if (currentColor === 'green') {
+        errorsGreen++;
+      } else {
+        errorsYellow++;
+      }
+
+      timeEl.textContent = 'Fehler: Reaktion auf Dreieck';
+
+      hideStimulus();
+
+      if (shownStimuli >= maxStimuli) {
+        endExperiment();
+      } else {
+        scheduleNextStimulus();
+      }
+    }
+
+    function handlePrematureError() {
+      errorsTotal++;
+      prematureErrors++;
+      timeEl.textContent = `Fehler: zu früh gedrückt (${prematureErrors})`;
     }
 
     function endExperiment() {
       experimentActive = false;
+      stimulusVisible = false;
+
       clearTimeout(pauseTimer);
       clearTimeout(triangleTimer);
+
       stimulusEl.style.display = 'none';
       instructionEl.textContent = 'Experiment beendet – Leertaste zum Neustart';
+
       showResults();
     }
 
-    window.addEventListener('keydown', e => {
-      if (e.key === ' ') {
+    window.addEventListener('keydown', function (event) {
+      if (event.repeat) {
+        return;
+      }
+
+      if (event.key === ' ') {
+        event.preventDefault();
+
         if (!experimentActive) {
           startExperiment();
-        } else if (stimulusEl.style.display === 'block') {
-          if (currentShape === 'square') {
-            const rt = performance.now() - startTime;
-            validResponses++;
-            currentColor === 'purple' ? timesPurple.push(rt) : timesOrange.push(rt);
-            timeEl.textContent  = `${Math.round(rt)} ms`;
-            countEl.textContent = `${validResponses} / ${maxTrials}`;
-            stimulusEl.style.display = 'none';
-            clearTimeout(triangleTimer);
-            scheduleNext();
-          } else {
-            currentColor === 'purple' ? errorsPurple++ : errorsOrange++;
-            stimulusEl.style.display = 'none';
-            clearTimeout(triangleTimer);
-            scheduleNext();
+          return;
+        }
+
+        if (stimulusVisible) {
+          if (currentShape === 'circle') {
+            handleCircleResponse();
+          } else if (currentShape === 'triangle') {
+            handleTriangleError();
           }
+        } else {
+          handlePrematureError();
         }
       }
-      else if (e.key.toLowerCase() === 'a' && experimentActive) {
+
+      if (event.key.toLowerCase() === 'a' && experimentActive) {
         endExperiment();
       }
     });

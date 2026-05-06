@@ -2,21 +2,34 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Test A.3 – Komplexe Stimuli mit Antwortwahl</title>
+
   <style>
     body {
       font-family: sans-serif;
       margin: 0;
       overflow: auto;
       position: relative;
+      background-color: white;
     }
+
     #instructions {
       padding: 1em;
       background: #fafafa;
       border-bottom: 1px solid #ddd;
     }
+
+    #instructions h3 {
+      margin-top: 0;
+    }
+
+    #main {
+      padding: 1em;
+    }
+
     #stimulus {
-      position: absolute;
+      position: fixed;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
@@ -24,127 +37,213 @@
       width: 600px;
       height: auto;
       max-width: 90vw;
+      max-height: 65vh;
       pointer-events: none;
+      border-radius: 8px;
     }
+
     #results p {
-      margin: 0.2em 1em;
+      margin: 0.3em 0;
     }
   </style>
 </head>
+
 <body>
   <div id="instructions">
     <h3>Test A.3 – Komplexe Stimuli mit Antwortwahl</h3>
     <ol>
-      <li>Es werden 30 Bilder von typischen Gerichten gezeigt: je 10 aus Deutschland, China und Mexiko.</li>
-      <li>Nach 2–6 Sekunden erscheint das nächste Bild zentriert.</li>
-      <li>Drücken Sie <strong>D</strong> für Deutschland, <strong>F</strong> für China, <strong>G</strong> für Mexiko.</li>
-      <li>Jede falsche Taste zählt als Fehlertaste.</li>
-      <li>Am Ende drücken Sie einmal <strong>a</strong>, um Mittelwert, Standardabweichung und Fehlerrate je Land anzuzeigen.</li>
+      <li>Es werden 30 Bilder von typischen Gerichten gezeigt: je 10 aus Deutschland, Vietnam und Spanien.</li>
+      <li>Die Reihenfolge der Bilder wird zu Beginn zufällig festgelegt.</li>
+      <li>Drücken Sie <strong>D</strong> für Deutschland, <strong>F</strong> für Vietnam, <strong>G</strong> für Spanien.</li>
+      <li>Jede falsche Taste zählt als Fehler.</li>
+      <li>Ein Tastendruck vor dem Erscheinen eines Bildes zählt als Fehler.</li>
+      <li>Nach jeder Antwort folgt eine zufällige Pause von 2–6 Sekunden.</li>
+      <li>Am Ende werden Mittelwert, Standardabweichung und Fehlerrate je Land angezeigt.</li>
     </ol>
   </div>
 
-  <h1>Test A.3 – Komplexe Stimuli mit Antwortwahl</h1>
-  <h2 id="instruction">Drücke Leertaste, um zu starten</h2>
-  <img id="stimulus" src="" alt="Stimulus">
+  <div id="main">
+    <h1>Test A.3 – Komplexe Stimuli mit Antwortwahl</h1>
+    <h2 id="instruction">Drücke Leertaste, um zu starten</h2>
 
-  <div id="results">
-    <p id="time"></p>
-    <p id="count"></p>
-    <p id="meanGER"></p>
-    <p id="sdGER"></p>
-    <p id="errGER"></p>
-    <p id="meanCHN"></p>
-    <p id="sdCHN"></p>
-    <p id="errCHN"></p>
-    <p id="meanMEX"></p>
-    <p id="sdMEX"></p>
-    <p id="errMEX"></p>
+    <div id="results">
+      <p id="time"></p>
+      <p id="count"></p>
+
+      <p id="meanGER"></p>
+      <p id="sdGER"></p>
+      <p id="errGER"></p>
+
+      <p id="meanVNM"></p>
+      <p id="sdVNM"></p>
+      <p id="errVNM"></p>
+
+      <p id="meanESP"></p>
+      <p id="sdESP"></p>
+      <p id="errESP"></p>
+
+      <p id="premature"></p>
+    </div>
   </div>
 
+  <img id="stimulus" src="" alt="Stimulus">
+
   <script>
-    // Hilfsfunktionen
     function getMean(arr) {
-      return arr.reduce((s, x) => s + x, 0) / arr.length;
+      if (arr.length === 0) return null;
+      return arr.reduce((sum, value) => sum + value, 0) / arr.length;
     }
+
     function getStd(arr) {
-      const m = getMean(arr);
-      return Math.sqrt(arr.reduce((s, x) => s + (x - m)**2, 0) / arr.length);
+      if (arr.length === 0) return null;
+
+      const mean = getMean(arr);
+      const variance = arr.reduce((sum, value) => {
+        return sum + Math.pow(value - mean, 2);
+      }, 0) / arr.length;
+
+      return Math.sqrt(variance);
     }
-    function shuffle(a) {
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
+
+    function formatMs(value) {
+      if (value === null) return 'keine gültigen Daten';
+      return `${Math.round(value)} ms`;
+    }
+
+    function formatPercent(value) {
+      return `${(value * 100).toFixed(1)} %`;
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const randomIndex = Math.floor(Math.random() * (i + 1));
+        [array[i], array[randomIndex]] = [array[randomIndex], array[i]];
       }
     }
 
-    // DOM-Elemente
     const instructionEl = document.getElementById('instruction');
-    const stimulusEl    = document.getElementById('stimulus');
-    const timeEl        = document.getElementById('time');
-    const countEl       = document.getElementById('count');
-    const meanGEREl     = document.getElementById('meanGER');
-    const sdGEREl       = document.getElementById('sdGER');
-    const errGEREl      = document.getElementById('errGER');
-    const meanCHNEl     = document.getElementById('meanCHN');
-    const sdCHNEl       = document.getElementById('sdCHN');
-    const errCHNEl      = document.getElementById('errCHN');
-    const meanMEXEl     = document.getElementById('meanMEX');
-    const sdMEXEl       = document.getElementById('sdMEX');
-    const errMEXEl      = document.getElementById('errMEX');
+    const stimulusEl = document.getElementById('stimulus');
 
-    // Bilder-Listen
-    const imagesGER = Array.from({length:10}, (_, i) => `images/ger${i+1}.jpg`);
-    const imagesCHN = Array.from({length:10}, (_, i) => `images/chn${i+1}.jpg`);
-    const imagesMEX = Array.from({length:10}, (_, i) => `images/mex${i+1}.jpg`);
+    const timeEl = document.getElementById('time');
+    const countEl = document.getElementById('count');
+
+    const meanGEREl = document.getElementById('meanGER');
+    const sdGEREl = document.getElementById('sdGER');
+    const errGEREl = document.getElementById('errGER');
+
+    const meanVNMEl = document.getElementById('meanVNM');
+    const sdVNMEl = document.getElementById('sdVNM');
+    const errVNMEl = document.getElementById('errVNM');
+
+    const meanESPEl = document.getElementById('meanESP');
+    const sdESPEl = document.getElementById('sdESP');
+    const errESPEl = document.getElementById('errESP');
+
+    const prematureEl = document.getElementById('premature');
+
+    const imagesGER = Array.from({ length: 10 }, (_, i) => `images/ger${i + 1}.jpg`);
+    const imagesVNM = Array.from({ length: 10 }, (_, i) => `images/vnm${i + 1}.jpg`);
+    const imagesESP = Array.from({ length: 10 }, (_, i) => `images/esp${i + 1}.jpg`);
 
     let sequence = [];
     let currentIndex = 0;
-    const timesGER = [], timesCHN = [], timesMEX = [];
-    let errorsGER = 0, errorsCHN = 0, errorsMEX = 0;
-    let validResponses = 0;          // NEU: zählt alle beantworteten Trials
+
+    let timesGER = [];
+    let timesVNM = [];
+    let timesESP = [];
+
+    let errorsGER = 0;
+    let errorsVNM = 0;
+    let errorsESP = 0;
+    let prematureErrors = 0;
+
+    let answeredGER = 0;
+    let answeredVNM = 0;
+    let answeredESP = 0;
+
     let experimentActive = false;
+    let stimulusVisible = false;
+
     let startTime = 0;
-    let pauseTimer;
+    let pauseTimer = null;
+
+    const expectedKeys = {
+      GER: 'd',
+      VNM: 'f',
+      ESP: 'g'
+    };
 
     function initSequence() {
       sequence = [];
-      imagesGER.forEach(url => sequence.push({country:'GER', url}));
-      imagesCHN.forEach(url => sequence.push({country:'CHN', url}));
-      imagesMEX.forEach(url => sequence.push({country:'MEX', url}));
+
+      imagesGER.forEach(url => {
+        sequence.push({ country: 'GER', url });
+      });
+
+      imagesVNM.forEach(url => {
+        sequence.push({ country: 'VNM', url });
+      });
+
+      imagesESP.forEach(url => {
+        sequence.push({ country: 'ESP', url });
+      });
+
       shuffle(sequence);
       currentIndex = 0;
     }
 
     function clearResults() {
-      [timeEl, countEl,
-       meanGEREl, sdGEREl, errGEREl,
-       meanCHNEl, sdCHNEl, errCHNEl,
-       meanMEXEl, sdMEXEl, errMEXEl]
-      .forEach(el => el.textContent = '');
+      timeEl.textContent = '';
+      countEl.textContent = '';
+
+      meanGEREl.textContent = '';
+      sdGEREl.textContent = '';
+      errGEREl.textContent = '';
+
+      meanVNMEl.textContent = '';
+      sdVNMEl.textContent = '';
+      errVNMEl.textContent = '';
+
+      meanESPEl.textContent = '';
+      sdESPEl.textContent = '';
+      errESPEl.textContent = '';
+
+      prematureEl.textContent = '';
     }
 
     function showResults() {
-      const mGER = timesGER.length ? Math.round(getMean(timesGER)) : 0;
-      const sGER = timesGER.length ? Math.round(getStd(timesGER))  : 0;
-      meanGEREl.textContent = `DE Mittel: ${mGER} ms`;
-      sdGEREl.textContent   = `DE SD: ${sGER} ms`;
-      errGEREl.textContent  = `DE Fehler: ${errorsGER}`;
+      countEl.textContent =
+        `Beantwortete Bilder: ${answeredGER + answeredVNM + answeredESP} / ${sequence.length}`;
 
-      const mCHN = timesCHN.length ? Math.round(getMean(timesCHN)) : 0;
-      const sCHN = timesCHN.length ? Math.round(getStd(timesCHN))  : 0;
-      meanCHNEl.textContent = `CN Mittel: ${mCHN} ms`;
-      sdCHNEl.textContent   = `CN SD: ${sCHN} ms`;
-      errCHNEl.textContent  = `CN Fehler: ${errorsCHN}`;
+      const errorRateGER = answeredGER > 0 ? errorsGER / answeredGER : 0;
+      const errorRateVNM = answeredVNM > 0 ? errorsVNM / answeredVNM : 0;
+      const errorRateESP = answeredESP > 0 ? errorsESP / answeredESP : 0;
 
-      const mMEX = timesMEX.length ? Math.round(getMean(timesMEX)) : 0;
-      const sMEX = timesMEX.length ? Math.round(getStd(timesMEX))  : 0;
-      meanMEXEl.textContent = `MX Mittel: ${mMEX} ms`;
-      sdMEXEl.textContent   = `MX SD: ${sMEX} ms`;
-      errMEXEl.textContent  = `MX Fehler: ${errorsMEX}`;
+      meanGEREl.textContent = `Deutschland Mittelwert: ${formatMs(getMean(timesGER))}`;
+      sdGEREl.textContent = `Deutschland Standardabweichung: ${formatMs(getStd(timesGER))}`;
+      errGEREl.textContent =
+        `Deutschland Fehlerrate: ${formatPercent(errorRateGER)} (${errorsGER} Fehler bei ${answeredGER} Bildern)`;
+
+      meanVNMEl.textContent = `Vietnam Mittelwert: ${formatMs(getMean(timesVNM))}`;
+      sdVNMEl.textContent = `Vietnam Standardabweichung: ${formatMs(getStd(timesVNM))}`;
+      errVNMEl.textContent =
+        `Vietnam Fehlerrate: ${formatPercent(errorRateVNM)} (${errorsVNM} Fehler bei ${answeredVNM} Bildern)`;
+
+      meanESPEl.textContent = `Spanien Mittelwert: ${formatMs(getMean(timesESP))}`;
+      sdESPEl.textContent = `Spanien Standardabweichung: ${formatMs(getStd(timesESP))}`;
+      errESPEl.textContent =
+        `Spanien Fehlerrate: ${formatPercent(errorRateESP)} (${errorsESP} Fehler bei ${answeredESP} Bildern)`;
+
+      prematureEl.textContent =
+        `Zu frühe Tastendrücke: ${prematureErrors}`;
     }
 
-    function scheduleNext() {
+    function scheduleNextStimulus() {
       pauseTimer = setTimeout(() => {
+        if (!experimentActive) {
+          return;
+        }
+
         if (currentIndex >= sequence.length) {
           endExperiment();
         } else {
@@ -154,62 +253,150 @@
     }
 
     function showStimulus() {
-      const item = sequence[currentIndex++];
-      stimulusEl.src             = item.url;
+      if (!experimentActive) {
+        return;
+      }
+
+      if (currentIndex >= sequence.length) {
+        endExperiment();
+        return;
+      }
+
+      const item = sequence[currentIndex];
+
+      stimulusEl.src = item.url;
       stimulusEl.dataset.country = item.country;
-      stimulusEl.style.display   = 'block';
+      stimulusEl.style.display = 'block';
+
+      stimulusVisible = true;
       startTime = performance.now();
+
+      countEl.textContent =
+        `Bild ${currentIndex + 1} / ${sequence.length}`;
     }
 
     function startExperiment() {
+      clearTimeout(pauseTimer);
+
       initSequence();
-      [timesGER, timesCHN, timesMEX].forEach(arr => arr.length = 0);
-      errorsGER = errorsCHN = errorsMEX = 0;
-      validResponses = 0;    // NEU: zurücksetzen
-      clearResults();
+
+      timesGER = [];
+      timesVNM = [];
+      timesESP = [];
+
+      errorsGER = 0;
+      errorsVNM = 0;
+      errorsESP = 0;
+      prematureErrors = 0;
+
+      answeredGER = 0;
+      answeredVNM = 0;
+      answeredESP = 0;
+
       experimentActive = true;
-      instructionEl.textContent = 'Drücke D/F/G entsprechend dem Land';
-      scheduleNext();
+      stimulusVisible = false;
+
+      stimulusEl.style.display = 'none';
+      stimulusEl.src = '';
+
+      clearResults();
+
+      instructionEl.textContent = 'Drücke D für Deutschland, F für Vietnam, G für Spanien';
+      scheduleNextStimulus();
+    }
+
+    function handleAnswer(key) {
+      if (!stimulusVisible) {
+        prematureErrors++;
+        timeEl.textContent = `Fehler: zu früh gedrückt (${prematureErrors})`;
+        return;
+      }
+
+      const country = stimulusEl.dataset.country;
+      const expectedKey = expectedKeys[country];
+      const reactionTime = performance.now() - startTime;
+
+      if (country === 'GER') {
+        answeredGER++;
+      } else if (country === 'VNM') {
+        answeredVNM++;
+      } else if (country === 'ESP') {
+        answeredESP++;
+      }
+
+      if (key === expectedKey) {
+        if (country === 'GER') {
+          timesGER.push(reactionTime);
+        } else if (country === 'VNM') {
+          timesVNM.push(reactionTime);
+        } else if (country === 'ESP') {
+          timesESP.push(reactionTime);
+        }
+
+        timeEl.textContent = `Letzte korrekte Entscheidungszeit: ${Math.round(reactionTime)} ms`;
+      } else {
+        if (country === 'GER') {
+          errorsGER++;
+        } else if (country === 'VNM') {
+          errorsVNM++;
+        } else if (country === 'ESP') {
+          errorsESP++;
+        }
+
+        timeEl.textContent = `Fehler: falsche Taste`;
+      }
+
+      stimulusVisible = false;
+      stimulusEl.style.display = 'none';
+
+      currentIndex++;
+
+      if (currentIndex >= sequence.length) {
+        endExperiment();
+      } else {
+        scheduleNextStimulus();
+      }
     }
 
     function endExperiment() {
       experimentActive = false;
+      stimulusVisible = false;
+
       clearTimeout(pauseTimer);
+
       stimulusEl.style.display = 'none';
       instructionEl.textContent = 'Experiment beendet – Leertaste zum Neustart';
+
       showResults();
     }
 
-    window.addEventListener('keydown', e => {
-      const key = e.key.toLowerCase();
-      if (key === ' ' && !experimentActive) {
-        startExperiment();
+    window.addEventListener('keydown', function (event) {
+      if (event.repeat) {
+        return;
       }
-      else if (experimentActive && stimulusEl.style.display === 'block') {
-        const rt = performance.now() - startTime;
-        validResponses++;   // NEU: Zähler hochsetzen
-        // RT- und Count-Anzeige aktualisieren
-        timeEl.textContent  = `${Math.round(rt)} ms`;
-        countEl.textContent = `${validResponses} / ${sequence.length}`;
 
-        const country = stimulusEl.dataset.country;
-        // Reaktionszeit sammeln
-        if (country === 'GER') timesGER.push(rt);
-        else if (country === 'CHN') timesCHN.push(rt);
-        else if (country === 'MEX') timesMEX.push(rt);
-        // Fehler zählen
-        if ((country==='GER' && key!=='d') ||
-            (country==='CHN' && key!=='f') ||
-            (country==='MEX' && key!=='g')) {
-          if (country==='GER') errorsGER++;
-          if (country==='CHN') errorsCHN++;
-          if (country==='MEX') errorsMEX++;
+      const key = event.key.toLowerCase();
+
+      if (key === ' ') {
+        event.preventDefault();
+
+        if (!experimentActive) {
+          startExperiment();
+        } else if (!stimulusVisible) {
+          prematureErrors++;
+          timeEl.textContent = `Fehler: zu früh gedrückt (${prematureErrors})`;
         }
-        stimulusEl.style.display = 'none';
-        scheduleNext();
+
+        return;
       }
-      else if (key === 'a' && experimentActive) {
+
+      if (key === 'a' && experimentActive) {
         endExperiment();
+        return;
+      }
+
+      if (experimentActive && ['d', 'f', 'g'].includes(key)) {
+        handleAnswer(key);
       }
     });
   </script>
