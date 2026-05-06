@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Test A.2 – Entscheidungs-Reaktionstest</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; overflow: hidden; position: relative; }
+    #instructions {
+      padding: 1em;
+      background: #fafafa;
+      border-bottom: 1px solid #ddd;
+    }
+    #stimulus {
+      position: absolute;
+      pointer-events: none;
+      display: none;
+    }
+    #results p {
+      margin: 0.2em 1em;
+    }
+  </style>
+</head>
+<body>
+  <!-- Erklärung für A.2 -->
+  <div id="instructions">
+    <h3>Test A.2 – Entscheidungs-Reaktionstest</h3>
+    <ol>
+      <li>Auf dem weißen Bildschirm erscheinen nacheinander farbige Formen (Quadrat oder gleichseitiges Dreieck) in Lila oder Orange, mit Größe 100–300 px.</li>
+      <li>Drücken Sie nur bei Quadraten die Leertaste so schnell wie möglich.</li>
+      <li>Ignorieren Sie Dreiecke (keine Taste drücken). Jede Reaktion auf ein Dreieck zählt als Fehler.</li>
+      <li>Es werden insgesamt 30 gültige Reaktionen auf Quadrate aufgezeichnet.</li>
+      <li>Am Ende drücken Sie einmal <strong>a</strong>, um die Ergebnisse anzuzeigen: Mittelwert, Standardabweichung und Fehlerrate jeweils getrennt für Lila und Orange.</li>
+    </ol>
+  </div>
+
+  <h1>Test A.2 – Entscheidungs-Reaktionstest</h1>
+  <h2 id="instruction">Drücke Leertaste, um zu starten</h2>
+  <div id="stimulus"></div>
+
+  <div id="results">
+    <p id="time"></p>
+    <p id="count"></p>
+    <p id="meanPurple"></p>
+    <p id="sdPurple"></p>
+    <p id="errPurple"></p>
+    <p id="meanOrange"></p>
+    <p id="sdOrange"></p>
+    <p id="errOrange"></p>
+  </div>
+
+  <script>
+    // DOM-Elemente
+    const instructionEl = document.getElementById('instruction');
+    const stimulusEl   = document.getElementById('stimulus');
+    const timeEl       = document.getElementById('time');
+    const countEl      = document.getElementById('count');
+    const meanPurpleEl = document.getElementById('meanPurple');
+    const sdPurpleEl   = document.getElementById('sdPurple');
+    const errPurpleEl  = document.getElementById('errPurple');
+    const meanOrangeEl = document.getElementById('meanOrange');
+    const sdOrangeEl   = document.getElementById('sdOrange');
+    const errOrangeEl  = document.getElementById('errOrange');
+
+    // Statistische Hilfsfunktionen
+    function getMean(arr) {
+      return arr.reduce((sum, x) => sum + x, 0) / arr.length;
+    }
+    function getStd(arr) {
+      const m = getMean(arr);
+      return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / arr.length);
+    }
+
+    // Experiment-Variablen
+    let experimentActive  = false;
+    const maxTrials       = 30;
+    let timesPurple       = [];
+    let timesOrange       = [];
+    let errorsPurple      = 0;
+    let errorsOrange      = 0;
+    let validResponses    = 0;
+    let currentShape      = null;
+    let currentColor      = null;
+    let startTime         = 0;
+    let pauseTimer        = null;
+    let triangleTimer     = null;
+
+    // Anzeige-Funktionen
+    function clearResults() {
+      timeEl.textContent        = '';
+      countEl.textContent       = '';
+      meanPurpleEl.textContent  = '';
+      sdPurpleEl.textContent    = '';
+      errPurpleEl.textContent   = '';
+      meanOrangeEl.textContent  = '';
+      sdOrangeEl.textContent    = '';
+      errOrangeEl.textContent   = '';
+    }
+
+    function showResults() {
+      countEl.textContent = `Versuche: ${validResponses} / ${maxTrials}`;
+      const meanP = timesPurple.length ? Math.round(getMean(timesPurple)) : 0;
+      const sdP   = timesPurple.length ? Math.round(getStd(timesPurple))  : 0;
+      meanPurpleEl.textContent = `Mittel (lila): ${meanP} ms`;
+      sdPurpleEl.textContent   = `SD (lila): ${sdP} ms`;
+      errPurpleEl.textContent  = `Fehler (lila): ${errorsPurple}`;
+
+      const meanO = timesOrange.length ? Math.round(getMean(timesOrange)) : 0;
+      const sdO   = timesOrange.length ? Math.round(getStd(timesOrange))  : 0;
+      meanOrangeEl.textContent = `Mittel (orange): ${meanO} ms`;
+      sdOrangeEl.textContent   = `SD (orange): ${sdO} ms`;
+      errOrangeEl.textContent  = `Fehler (orange): ${errorsOrange}`;
+    }
+
+    // Stimulus anzeigen
+    function showStimulus() {
+      currentShape = Math.random() < 0.5 ? 'square' : 'triangle';
+      const size   = 100 + Math.random() * 200;
+      currentColor = Math.random() < 0.5 ? 'purple' : 'orange';
+
+      // Styling
+      stimulusEl.style.border = '';
+      if (currentShape === 'square') {
+        stimulusEl.style.width           = `${size}px`;
+        stimulusEl.style.height          = `${size}px`;
+        stimulusEl.style.backgroundColor = currentColor;
+      } else {
+        stimulusEl.style.width           = '0';
+        stimulusEl.style.height          = '0';
+        stimulusEl.style.backgroundColor = 'transparent';
+        stimulusEl.style.borderLeft      = `${size/2}px solid transparent`;
+        stimulusEl.style.borderRight     = `${size/2}px solid transparent`;
+        stimulusEl.style.borderBottom    = `${size}px solid ${currentColor}`;
+      }
+
+      // Position
+      const w = window.innerWidth  - size;
+      const h = window.innerHeight - size;
+      const x = Math.random() * Math.max(w,0);
+      const y = Math.random() * Math.max(h,0);
+      stimulusEl.style.left    = `${x}px`;
+      stimulusEl.style.top     = `${y}px`;
+      stimulusEl.style.display = 'block';
+
+      if (currentShape === 'square') {
+        startTime = performance.now();
+      } else {
+        triangleTimer = setTimeout(() => {
+          stimulusEl.style.display = 'none';
+          scheduleNext();
+        }, 1000 + Math.random() * 3000);
+      }
+    }
+
+    function scheduleNext() {
+      pauseTimer = setTimeout(() => {
+        if (validResponses >= maxTrials) {
+          endExperiment();
+        } else {
+          showStimulus();
+        }
+      }, Math.random() * 4000 + 2000); // 2–6 s
+    }
+
+    function startExperiment() {
+      clearTimeout(pauseTimer);
+      clearTimeout(triangleTimer);
+      experimentActive = true;
+      validResponses   = 0;
+      timesPurple      = [];
+      timesOrange      = [];
+      errorsPurple     = 0;
+      errorsOrange     = 0;
+      clearResults();
+      instructionEl.textContent = 'Reagiere nur auf Quadrate mit der Leertaste';
+      scheduleNext();
+    }
+
+    function endExperiment() {
+      experimentActive = false;
+      clearTimeout(pauseTimer);
+      clearTimeout(triangleTimer);
+      stimulusEl.style.display = 'none';
+      instructionEl.textContent = 'Experiment beendet – Leertaste zum Neustart';
+      showResults();
+    }
+
+    window.addEventListener('keydown', e => {
+      if (e.key === ' ') {
+        if (!experimentActive) {
+          startExperiment();
+        } else if (stimulusEl.style.display === 'block') {
+          if (currentShape === 'square') {
+            const rt = performance.now() - startTime;
+            validResponses++;
+            currentColor === 'purple' ? timesPurple.push(rt) : timesOrange.push(rt);
+            timeEl.textContent  = `${Math.round(rt)} ms`;
+            countEl.textContent = `${validResponses} / ${maxTrials}`;
+            stimulusEl.style.display = 'none';
+            clearTimeout(triangleTimer);
+            scheduleNext();
+          } else {
+            currentColor === 'purple' ? errorsPurple++ : errorsOrange++;
+            stimulusEl.style.display = 'none';
+            clearTimeout(triangleTimer);
+            scheduleNext();
+          }
+        }
+      }
+      else if (e.key.toLowerCase() === 'a' && experimentActive) {
+        endExperiment();
+      }
+    });
+  </script>
+</body>
+</html>

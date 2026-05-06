@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Test A.3 – Komplexe Stimuli mit Antwortwahl</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      overflow: auto;
+      position: relative;
+    }
+    #instructions {
+      padding: 1em;
+      background: #fafafa;
+      border-bottom: 1px solid #ddd;
+    }
+    #stimulus {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+      width: 600px;
+      height: auto;
+      max-width: 90vw;
+      pointer-events: none;
+    }
+    #results p {
+      margin: 0.2em 1em;
+    }
+  </style>
+</head>
+<body>
+  <div id="instructions">
+    <h3>Test A.3 – Komplexe Stimuli mit Antwortwahl</h3>
+    <ol>
+      <li>Es werden 30 Bilder von typischen Gerichten gezeigt: je 10 aus Deutschland, China und Mexiko.</li>
+      <li>Nach 2–6 Sekunden erscheint das nächste Bild zentriert.</li>
+      <li>Drücken Sie <strong>D</strong> für Deutschland, <strong>F</strong> für China, <strong>G</strong> für Mexiko.</li>
+      <li>Jede falsche Taste zählt als Fehlertaste.</li>
+      <li>Am Ende drücken Sie einmal <strong>a</strong>, um Mittelwert, Standardabweichung und Fehlerrate je Land anzuzeigen.</li>
+    </ol>
+  </div>
+
+  <h1>Test A.3 – Komplexe Stimuli mit Antwortwahl</h1>
+  <h2 id="instruction">Drücke Leertaste, um zu starten</h2>
+  <img id="stimulus" src="" alt="Stimulus">
+
+  <div id="results">
+    <p id="time"></p>
+    <p id="count"></p>
+    <p id="meanGER"></p>
+    <p id="sdGER"></p>
+    <p id="errGER"></p>
+    <p id="meanCHN"></p>
+    <p id="sdCHN"></p>
+    <p id="errCHN"></p>
+    <p id="meanMEX"></p>
+    <p id="sdMEX"></p>
+    <p id="errMEX"></p>
+  </div>
+
+  <script>
+    // Hilfsfunktionen
+    function getMean(arr) {
+      return arr.reduce((s, x) => s + x, 0) / arr.length;
+    }
+    function getStd(arr) {
+      const m = getMean(arr);
+      return Math.sqrt(arr.reduce((s, x) => s + (x - m)**2, 0) / arr.length);
+    }
+    function shuffle(a) {
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+    }
+
+    // DOM-Elemente
+    const instructionEl = document.getElementById('instruction');
+    const stimulusEl    = document.getElementById('stimulus');
+    const timeEl        = document.getElementById('time');
+    const countEl       = document.getElementById('count');
+    const meanGEREl     = document.getElementById('meanGER');
+    const sdGEREl       = document.getElementById('sdGER');
+    const errGEREl      = document.getElementById('errGER');
+    const meanCHNEl     = document.getElementById('meanCHN');
+    const sdCHNEl       = document.getElementById('sdCHN');
+    const errCHNEl      = document.getElementById('errCHN');
+    const meanMEXEl     = document.getElementById('meanMEX');
+    const sdMEXEl       = document.getElementById('sdMEX');
+    const errMEXEl      = document.getElementById('errMEX');
+
+    // Bilder-Listen
+    const imagesGER = Array.from({length:10}, (_, i) => `images/ger${i+1}.jpg`);
+    const imagesCHN = Array.from({length:10}, (_, i) => `images/chn${i+1}.jpg`);
+    const imagesMEX = Array.from({length:10}, (_, i) => `images/mex${i+1}.jpg`);
+
+    let sequence = [];
+    let currentIndex = 0;
+    const timesGER = [], timesCHN = [], timesMEX = [];
+    let errorsGER = 0, errorsCHN = 0, errorsMEX = 0;
+    let validResponses = 0;          // NEU: zählt alle beantworteten Trials
+    let experimentActive = false;
+    let startTime = 0;
+    let pauseTimer;
+
+    function initSequence() {
+      sequence = [];
+      imagesGER.forEach(url => sequence.push({country:'GER', url}));
+      imagesCHN.forEach(url => sequence.push({country:'CHN', url}));
+      imagesMEX.forEach(url => sequence.push({country:'MEX', url}));
+      shuffle(sequence);
+      currentIndex = 0;
+    }
+
+    function clearResults() {
+      [timeEl, countEl,
+       meanGEREl, sdGEREl, errGEREl,
+       meanCHNEl, sdCHNEl, errCHNEl,
+       meanMEXEl, sdMEXEl, errMEXEl]
+      .forEach(el => el.textContent = '');
+    }
+
+    function showResults() {
+      const mGER = timesGER.length ? Math.round(getMean(timesGER)) : 0;
+      const sGER = timesGER.length ? Math.round(getStd(timesGER))  : 0;
+      meanGEREl.textContent = `DE Mittel: ${mGER} ms`;
+      sdGEREl.textContent   = `DE SD: ${sGER} ms`;
+      errGEREl.textContent  = `DE Fehler: ${errorsGER}`;
+
+      const mCHN = timesCHN.length ? Math.round(getMean(timesCHN)) : 0;
+      const sCHN = timesCHN.length ? Math.round(getStd(timesCHN))  : 0;
+      meanCHNEl.textContent = `CN Mittel: ${mCHN} ms`;
+      sdCHNEl.textContent   = `CN SD: ${sCHN} ms`;
+      errCHNEl.textContent  = `CN Fehler: ${errorsCHN}`;
+
+      const mMEX = timesMEX.length ? Math.round(getMean(timesMEX)) : 0;
+      const sMEX = timesMEX.length ? Math.round(getStd(timesMEX))  : 0;
+      meanMEXEl.textContent = `MX Mittel: ${mMEX} ms`;
+      sdMEXEl.textContent   = `MX SD: ${sMEX} ms`;
+      errMEXEl.textContent  = `MX Fehler: ${errorsMEX}`;
+    }
+
+    function scheduleNext() {
+      pauseTimer = setTimeout(() => {
+        if (currentIndex >= sequence.length) {
+          endExperiment();
+        } else {
+          showStimulus();
+        }
+      }, Math.random() * 4000 + 2000);
+    }
+
+    function showStimulus() {
+      const item = sequence[currentIndex++];
+      stimulusEl.src             = item.url;
+      stimulusEl.dataset.country = item.country;
+      stimulusEl.style.display   = 'block';
+      startTime = performance.now();
+    }
+
+    function startExperiment() {
+      initSequence();
+      [timesGER, timesCHN, timesMEX].forEach(arr => arr.length = 0);
+      errorsGER = errorsCHN = errorsMEX = 0;
+      validResponses = 0;    // NEU: zurücksetzen
+      clearResults();
+      experimentActive = true;
+      instructionEl.textContent = 'Drücke D/F/G entsprechend dem Land';
+      scheduleNext();
+    }
+
+    function endExperiment() {
+      experimentActive = false;
+      clearTimeout(pauseTimer);
+      stimulusEl.style.display = 'none';
+      instructionEl.textContent = 'Experiment beendet – Leertaste zum Neustart';
+      showResults();
+    }
+
+    window.addEventListener('keydown', e => {
+      const key = e.key.toLowerCase();
+      if (key === ' ' && !experimentActive) {
+        startExperiment();
+      }
+      else if (experimentActive && stimulusEl.style.display === 'block') {
+        const rt = performance.now() - startTime;
+        validResponses++;   // NEU: Zähler hochsetzen
+        // RT- und Count-Anzeige aktualisieren
+        timeEl.textContent  = `${Math.round(rt)} ms`;
+        countEl.textContent = `${validResponses} / ${sequence.length}`;
+
+        const country = stimulusEl.dataset.country;
+        // Reaktionszeit sammeln
+        if (country === 'GER') timesGER.push(rt);
+        else if (country === 'CHN') timesCHN.push(rt);
+        else if (country === 'MEX') timesMEX.push(rt);
+        // Fehler zählen
+        if ((country==='GER' && key!=='d') ||
+            (country==='CHN' && key!=='f') ||
+            (country==='MEX' && key!=='g')) {
+          if (country==='GER') errorsGER++;
+          if (country==='CHN') errorsCHN++;
+          if (country==='MEX') errorsMEX++;
+        }
+        stimulusEl.style.display = 'none';
+        scheduleNext();
+      }
+      else if (key === 'a' && experimentActive) {
+        endExperiment();
+      }
+    });
+  </script>
+</body>
+</html>

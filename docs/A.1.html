@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Test A.1 – Einfacher Reaktionstest</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      overflow: hidden;
+      position: relative;
+    }
+    #instructions {
+      padding: 1em;
+      background: #fafafa;
+      border-bottom: 1px solid #ddd;
+    }
+    #stimulus {
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      background-color: white;
+      display: none;
+      pointer-events: none;
+    }
+    #results p {
+      margin: 0.2em 1em;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Erklärung für A.1 -->
+  <div id="instructions">
+    <h3>Test A.1 – Einfacher Reaktionstest</h3>
+    <ol>
+      <li>Sie sehen einen weißen Bildschirm.</li>
+      <li>Nach 2–6 Sekunden blendet an einer zufälligen Position ein Quadrat (100 × 100 px) über 3 Sekunden von weiß nach schwarz ein.</li>
+      <li>Drücken Sie die <strong>Leertaste</strong>, sobald das Quadrat für Sie erkennbar ist.</li>
+      <li>Jede Tasteneingabe vor dem vollständigen Erscheinen zählt als Fehlertaste.</li>
+      <li>Es werden insgesamt 30 gültige Reaktionen aufgezeichnet.</li>
+      <li>Am Ende drücken Sie einmal <strong>a</strong>, um Mittelwert, Standardabweichung, Fehlertasten und Korrelation zur Mitte anzuzeigen.</li>
+    </ol>
+  </div>
+
+  <h1>Test A.1 – Einfacher Reaktionstest</h1>
+  <h2 id="instruction">Drücke Leertaste, um zu starten</h2>
+  <div id="stimulus"></div>
+
+  <div id="results">
+    <p id="time"></p>
+    <p id="count"></p>
+    <p id="mean"></p>
+    <p id="sd"></p>
+    <p id="errors"></p>
+    <p id="corr"></p>
+  </div>
+
+  <script>
+    // --- DOM-Elemente ---
+    const instructionEl = document.getElementById('instruction');
+    const stimulusEl   = document.getElementById('stimulus');
+    const timeEl       = document.getElementById('time');
+    const countEl      = document.getElementById('count');
+    const meanEl       = document.getElementById('mean');
+    const sdEl         = document.getElementById('sd');
+    const errorEl      = document.getElementById('errors');
+    const corrEl       = document.getElementById('corr');
+
+    // --- Statistische Hilfsfunktionen ---
+    function getMean(arr) {
+      return arr.reduce((s, x) => s + x, 0) / arr.length;
+    }
+    function getStd(arr) {
+      const m = getMean(arr);
+      return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / arr.length);
+    }
+    function getCorr(x, y) {
+      const mx = getMean(x), my = getMean(y);
+      const cov = x.reduce((s, xi, i) =>
+        s + (xi - mx) * (y[i] - my)
+      , 0) / x.length;
+      return cov / (getStd(x) * getStd(y));
+    }
+
+    // --- Experiment-Variablen ---
+    let experimentActive = false;
+    let isFading         = false;
+    let fadeStart        = 0;
+    let fadeTimer        = null;
+    let pauseTimer       = null;
+    const maxTrials      = 30;
+    let times            = [];
+    let distances        = [];
+    let errors           = 0;
+    let validResponses   = 0;    // NEU: zählt die gültigen Reaktionen
+
+    // --- Anzeige-Funktionen ---
+    function clearResults() {
+      timeEl.textContent  = '';
+      countEl.textContent = '';
+      meanEl.textContent  = '';
+      sdEl.textContent    = '';
+      errorEl.textContent = '';
+      corrEl.textContent  = '';
+    }
+
+    function showResults() {
+      countEl.textContent = `Versuche: ${validResponses} / ${maxTrials}`;
+      meanEl.textContent  = `Mittel: ${Math.round(getMean(times))} ms`;
+      sdEl.textContent    = `SD: ${Math.round(getStd(times))} ms`;
+      errorEl.textContent = `Fehlertasten: ${errors}`;
+      const r = Math.round(getCorr(distances, times) * 1000) / 1000;
+      corrEl.textContent  = `Korrelation Distanz–RT: ${r}`;
+    }
+
+    // --- Ablauf-Funktionen ---
+    function startFade() {
+      // Position zufällig wählen
+      const w = window.innerWidth  - 100;
+      const h = window.innerHeight - 100;
+      const x = Math.random() * w;
+      const y = Math.random() * h;
+      stimulusEl.style.left    = `${x}px`;
+      stimulusEl.style.top     = `${y}px`;
+      stimulusEl.style.display = 'block';
+
+      // Abstand zur Mitte speichern
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      distances.push(Math.hypot(x + 50 - cx, y + 50 - cy));
+
+      // Fade-In über 3 s
+      const duration = 3000;
+      const t0 = performance.now();
+      fadeStart = t0;
+      isFading  = true;
+      cancelAnimationFrame(fadeTimer);
+
+      (function fadeStep(now) {
+        const t = Math.min(1, (now - t0) / duration);
+        const v = Math.round(255 * (1 - t)); // 255→0
+        stimulusEl.style.backgroundColor = `rgb(${v},${v},${v})`;
+        if (t < 1) fadeTimer = requestAnimationFrame(fadeStep);
+      })(t0);
+    }
+
+    function scheduleNext() {
+      pauseTimer = setTimeout(() => {
+        if (validResponses >= maxTrials) {
+          endExperiment();
+        } else {
+          startFade();
+        }
+      }, Math.random() * 4000 + 2000); // 2–6 s
+    }
+
+    function startExperiment() {
+      clearTimeout(pauseTimer);
+      cancelAnimationFrame(fadeTimer);
+      experimentActive = true;
+      isFading         = false;
+      times            = [];
+      distances        = [];
+      errors           = 0;
+      validResponses   = 0;    // NEU: zurücksetzen
+      clearResults();
+      instructionEl.textContent = 'Reagiere, sobald das Quadrat erkennbar ist';
+      scheduleNext();
+    }
+
+    function endExperiment() {
+      experimentActive = false;
+      clearTimeout(pauseTimer);
+      cancelAnimationFrame(fadeTimer);
+      stimulusEl.style.display = 'none';
+      instructionEl.textContent = 'Experiment beendet – Leertaste zum Neustart';
+      showResults();
+    }
+
+    // --- Tastatur-Listener ---
+    window.addEventListener('keydown', e => {
+      if (e.key === ' ') {
+        if (!experimentActive) {
+          startExperiment();
+        } else if (isFading) {
+          // gültige Reaktion
+          const rt = performance.now() - fadeStart;
+          times.push(rt);
+          validResponses++;  // NEU: hochzählen
+          timeEl.textContent  = `${Math.round(rt)} ms`;
+          countEl.textContent = `${validResponses} / ${maxTrials}`;
+          isFading = false;
+          stimulusEl.style.display = 'none';
+          scheduleNext();
+        } else {
+          // Fehlertaste
+          errors++;
+        }
+      }
+      else if (e.key.toLowerCase() === 'a' && experimentActive) {
+        endExperiment();
+      }
+    });
+  </script>
+</body>
+</html>
